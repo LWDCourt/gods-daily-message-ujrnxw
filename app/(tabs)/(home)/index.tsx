@@ -1,104 +1,184 @@
-import React from "react";
-import { Stack, Link } from "expo-router";
-import { FlatList, Pressable, StyleSheet, View, Text, Alert, Platform } from "react-native";
-import { IconSymbol } from "@/components/IconSymbol";
-import { GlassView } from "expo-glass-effect";
-import { useTheme } from "@react-navigation/native";
 
-const ICON_COLOR = "#007AFF";
+import React, { useState, useEffect } from 'react';
+import { Stack, router } from 'expo-router';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { IconSymbol } from '@/components/IconSymbol';
+import { colors, commonStyles } from '@/styles/commonStyles';
+import {
+  loadUserSettings,
+  getScheduledNotificationsCount,
+  cancelAllNotifications,
+  saveUserSettings,
+} from '@/services/notificationService';
+import { UserSettings } from '@/types/notification';
 
 export default function HomeScreen() {
-  const theme = useTheme();
-  const modalDemos = [
-    {
-      title: "Standard Modal",
-      description: "Full screen modal presentation",
-      route: "/modal",
-      color: "#007AFF",
-    },
-    {
-      title: "Form Sheet",
-      description: "Bottom sheet with detents and grabber",
-      route: "/formsheet",
-      color: "#34C759",
-    },
-    {
-      title: "Transparent Modal",
-      description: "Overlay without obscuring background",
-      route: "/transparent-modal",
-      color: "#FF9500",
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const userSettings = await loadUserSettings();
+      
+      if (!userSettings || !userSettings.isSetup) {
+        // User hasn't completed setup, redirect to setup
+        router.replace('/(tabs)/(home)/setup-topic');
+        return;
+      }
+
+      setSettings(userSettings);
+      const count = await getScheduledNotificationsCount();
+      setNotificationCount(count);
+    } catch (error) {
+      console.log('Error loading settings:', error);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
-  const renderModalDemo = ({ item }: { item: (typeof modalDemos)[0] }) => (
-    <GlassView style={[
-      styles.demoCard,
-      Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-    ]} glassEffectStyle="regular">
-      <View style={[styles.demoIcon, { backgroundColor: item.color }]}>
-        <IconSymbol name="square.grid.3x3" color="white" size={24} />
+  const handleChangeSettings = () => {
+    router.push('/(tabs)/(home)/setup-topic');
+  };
+
+  const handleResetApp = async () => {
+    Alert.alert(
+      'Reset App',
+      'Are you sure you want to reset the app? This will cancel all scheduled messages.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelAllNotifications();
+              await saveUserSettings({
+                topic: '',
+                messagesPerDay: 0,
+                isSetup: false,
+              });
+              router.replace('/(tabs)/(home)/setup-topic');
+            } catch (error) {
+              console.log('Error resetting app:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
-      <View style={styles.demoContent}>
-        <Text style={[styles.demoTitle, { color: theme.colors.text }]}>{item.title}</Text>
-        <Text style={[styles.demoDescription, { color: theme.dark ? '#98989D' : '#666' }]}>{item.description}</Text>
-      </View>
-      <Link href={item.route as any} asChild>
-        <Pressable>
-          <GlassView style={[
-            styles.tryButton,
-            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }
-          ]} glassEffectStyle="clear">
-            <Text style={[styles.tryButtonText, { color: theme.colors.primary }]}>Try It</Text>
-          </GlassView>
-        </Pressable>
-      </Link>
-    </GlassView>
-  );
+    );
+  }
 
-  const renderHeaderRight = () => (
-    <Pressable
-      onPress={() => Alert.alert("Not Implemented", "This feature is not implemented yet")}
-      style={styles.headerButtonContainer}
-    >
-      <IconSymbol name="plus" color={theme.colors.primary} />
-    </Pressable>
-  );
-
-  const renderHeaderLeft = () => (
-    <Pressable
-      onPress={() => Alert.alert("Not Implemented", "This feature is not implemented yet")}
-      style={styles.headerButtonContainer}
-    >
-      <IconSymbol
-        name="gear"
-        color={theme.colors.primary}
-      />
-    </Pressable>
-  );
+  if (!settings) {
+    return null;
+  }
 
   return (
     <>
-      {Platform.OS === 'ios' && (
-        <Stack.Screen
-          options={{
-            title: "Building the app...",
-            headerRight: renderHeaderRight,
-            headerLeft: renderHeaderLeft,
-          }}
-        />
-      )}
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <FlatList
-          data={modalDemos}
-          renderItem={renderModalDemo}
-          keyExtractor={(item) => item.route}
-          contentContainerStyle={[
-            styles.listContainer,
-            Platform.OS !== 'ios' && styles.listContainerWithTabBar
-          ]}
-          contentInsetAdjustmentBehavior="automatic"
+      <Stack.Screen
+        options={{
+          title: 'Daily Messages',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={handleChangeSettings}
+              style={styles.headerButton}
+            >
+              <IconSymbol name="gear" color={colors.primary} size={24} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-        />
+        >
+          <View style={styles.header}>
+            <IconSymbol name="book.fill" size={80} color={colors.primary} />
+            <Text style={[commonStyles.title, styles.title]}>
+              Daily Messages from God
+            </Text>
+            <Text style={[commonStyles.textSecondary, styles.subtitle]}>
+              You&apos;re all set to receive personalized Bible verses
+            </Text>
+          </View>
+
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <IconSymbol name="tag.fill" size={32} color={colors.primary} />
+              <Text style={styles.statLabel}>Your Topic</Text>
+              <Text style={styles.statValue}>{settings.topic}</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <IconSymbol name="bell.fill" size={32} color={colors.primary} />
+              <Text style={styles.statLabel}>Messages Per Day</Text>
+              <Text style={styles.statValue}>{settings.messagesPerDay}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoCard}>
+            <View style={styles.infoHeader}>
+              <IconSymbol name="calendar" size={24} color={colors.primary} />
+              <Text style={styles.infoTitle}>Scheduled Messages</Text>
+            </View>
+            <Text style={styles.infoText}>
+              You have <Text style={styles.infoHighlight}>{notificationCount}</Text> messages scheduled for today
+            </Text>
+            <Text style={styles.infoDescription}>
+              Messages will be delivered at random times throughout the day between 8 AM and 9 PM
+            </Text>
+          </View>
+
+          <View style={styles.infoCard}>
+            <View style={styles.infoHeader}>
+              <IconSymbol name="sparkles" size={24} color={colors.primary} />
+              <Text style={styles.infoTitle}>How It Works</Text>
+            </View>
+            <Text style={styles.infoDescription}>
+              Each message contains a Bible verse (NIV) related to your chosen topic, rephrased as a personal message from God directly to you.
+            </Text>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleChangeSettings}
+            >
+              <IconSymbol name="pencil" size={20} color={colors.background} />
+              <Text style={styles.primaryButtonText}>Change Settings</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleResetApp}
+            >
+              <IconSymbol name="arrow.counterclockwise" size={20} color={colors.accent} />
+              <Text style={styles.secondaryButtonText}>Reset App</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </View>
     </>
   );
@@ -107,55 +187,130 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor handled dynamically
   },
-  listContainer: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  listContainerWithTabBar: {
-    paddingBottom: 100, // Extra padding for floating tab bar
-  },
-  demoCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  demoIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  demoContent: {
+  scrollView: {
     flex: 1,
   },
-  demoTitle: {
-    fontSize: 18,
+  scrollContent: {
+    padding: 20,
+    paddingBottom: Platform.OS === 'android' ? 100 : 40,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+    marginTop: 20,
+  },
+  title: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  statLabel: {
+    fontSize: 12,
     fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: 8,
     marginBottom: 4,
-    // color handled dynamically
+    textAlign: 'center',
   },
-  demoDescription: {
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  infoCard: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  infoText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+    marginBottom: 8,
+    lineHeight: 24,
+  },
+  infoHighlight: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  infoDescription: {
     fontSize: 14,
-    lineHeight: 18,
-    // color handled dynamically
+    fontWeight: '400',
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
-  headerButtonContainer: {
-    padding: 6,
+  buttonContainer: {
+    marginTop: 16,
+    gap: 12,
   },
-  tryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
-  tryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    // color handled dynamically
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.background,
+  },
+  secondaryButton: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  headerButton: {
+    padding: 8,
   },
 });
