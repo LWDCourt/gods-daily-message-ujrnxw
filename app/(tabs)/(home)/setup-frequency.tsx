@@ -26,9 +26,13 @@ export default function SetupFrequencyScreen() {
 
   const frequencies = [
     { value: 1, label: '1 message', description: 'Once a day' },
-    { value: 2, label: '2 messages', description: 'Morning & evening' },
-    { value: 3, label: '3 messages', description: 'Throughout the day' },
+    { value: 2, label: '2 messages', description: 'Twice a day' },
+    { value: 3, label: '3 messages', description: 'Three times a day' },
     { value: 5, label: '5 messages', description: 'Regular reminders' },
+    { value: 7, label: '7 messages', description: 'Frequent messages' },
+    { value: 10, label: '10 messages', description: 'Very frequent' },
+    { value: 15, label: '15 messages', description: 'Constant guidance' },
+    { value: 20, label: '20 messages', description: 'Maximum messages' },
   ];
 
   const handleFrequencySelect = (frequency: number) => {
@@ -93,7 +97,7 @@ export default function SetupFrequencyScreen() {
               How often would you like to hear from God?
             </Text>
             <Text style={[commonStyles.textSecondary, styles.subtitle]}>
-              Choose how many messages you&apos;d like to receive each day
+              Choose how many messages you&apos;d like to receive each day at random times
             </Text>
           </View>
 
@@ -140,6 +144,13 @@ export default function SetupFrequencyScreen() {
             </View>
           </View>
 
+          <View style={styles.infoBox}>
+            <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+            <Text style={styles.infoText}>
+              Messages will be delivered at completely random times throughout the day
+            </Text>
+          </View>
+
           <TouchableOpacity
             style={[
               styles.completeButton,
@@ -183,6 +194,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    textAlign: 'center',
   },
   topicCard: {
     backgroundColor: colors.card,
@@ -204,7 +216,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
@@ -249,6 +261,24 @@ const styles = StyleSheet.create({
   frequencyDescriptionSelected: {
     color: colors.background,
     opacity: 0.9,
+  },
+  infoBox: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   completeButton: {
     backgroundColor: colors.primary,

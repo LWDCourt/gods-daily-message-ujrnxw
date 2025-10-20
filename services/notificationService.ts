@@ -73,38 +73,42 @@ export async function loadUserSettings(): Promise<UserSettings | null> {
   }
 }
 
-// Generate random times throughout the day
+// Generate completely random times throughout the entire day
 function generateRandomTimes(count: number): Date[] {
   const times: Date[] = [];
   const now = new Date();
-  const startHour = 8; // Start at 8 AM
-  const endHour = 21; // End at 9 PM
   
-  // Calculate total minutes in the day window
-  const totalMinutes = (endHour - startHour) * 60;
+  // Start from current time
+  const startTime = now.getTime();
   
-  // Generate random minutes and sort them
-  const randomMinutes: number[] = [];
+  // End at midnight (start of next day)
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
+  const endTime = endOfDay.getTime();
+  
+  // Calculate available time window in milliseconds
+  const timeWindow = endTime - startTime;
+  
+  // Generate completely random timestamps
+  const randomTimestamps: number[] = [];
   for (let i = 0; i < count; i++) {
-    randomMinutes.push(Math.floor(Math.random() * totalMinutes));
+    // Generate random milliseconds within the time window
+    const randomOffset = Math.floor(Math.random() * timeWindow);
+    randomTimestamps.push(startTime + randomOffset);
   }
-  randomMinutes.sort((a, b) => a - b);
   
-  // Convert to actual times
-  for (const minutes of randomMinutes) {
-    const time = new Date(now);
-    time.setHours(startHour + Math.floor(minutes / 60));
-    time.setMinutes(minutes % 60);
-    time.setSeconds(0);
-    time.setMilliseconds(0);
-    
-    // If the time has passed today, schedule for tomorrow
-    if (time <= now) {
-      time.setDate(time.getDate() + 1);
-    }
-    
-    times.push(time);
+  // Sort timestamps chronologically
+  randomTimestamps.sort((a, b) => a - b);
+  
+  // Convert timestamps to Date objects
+  for (const timestamp of randomTimestamps) {
+    times.push(new Date(timestamp));
   }
+  
+  console.log(`Generated ${count} random notification times:`);
+  times.forEach((time, index) => {
+    console.log(`  ${index + 1}. ${time.toLocaleTimeString()}`);
+  });
   
   return times;
 }
@@ -115,11 +119,11 @@ export async function scheduleNotifications(topic: string, messagesPerDay: numbe
     // Cancel existing notifications
     await cancelAllNotifications();
     
-    // Generate random times
+    // Generate completely random times
     const times = generateRandomTimes(messagesPerDay);
     const notificationIds: string[] = [];
     
-    console.log(`Scheduling ${messagesPerDay} notifications for topic: ${topic}`);
+    console.log(`Scheduling ${messagesPerDay} notifications at random times for topic: ${topic}`);
     
     // Schedule each notification
     for (let i = 0; i < times.length; i++) {
@@ -145,15 +149,16 @@ export async function scheduleNotifications(topic: string, messagesPerDay: numbe
       });
       
       notificationIds.push(notificationId);
-      console.log(`Scheduled notification ${i + 1} at ${time.toLocaleTimeString()}`);
+      console.log(`Scheduled notification ${i + 1} at ${time.toLocaleTimeString()} - ${verse.reference}`);
     }
     
     // Save notification IDs
     await AsyncStorage.setItem(NOTIFICATION_IDS_KEY, JSON.stringify(notificationIds));
     
-    console.log('All notifications scheduled successfully');
+    console.log(`Successfully scheduled ${notificationIds.length} notifications at completely random times`);
   } catch (error) {
     console.log('Error scheduling notifications:', error);
+    throw error;
   }
 }
 
